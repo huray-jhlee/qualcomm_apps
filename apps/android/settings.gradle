@@ -10,6 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url "https://jitpack.io"}
     }
 }
 
@@ -35,6 +36,10 @@ if (Boolean.valueOf(properties["includeSemanticSegmentationApp"])) {
 
 if (Boolean.valueOf(properties["includeChatApp"])) {
     include ':ChatApp'
+}
+
+if (Boolean.valueOf(properties["includeHurayApp"])) {
+    include ':HurayApp'
 }
 
 include ':opencv'
