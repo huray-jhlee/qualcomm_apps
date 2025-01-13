@@ -217,34 +217,69 @@ public class ImageClassification implements AutoCloseable {
 
         // 1. 이미지 리사이즈 (480x480 고정)
         Bitmap resizedImage = Bitmap.createScaledBitmap(image, 480, 480, true);
+        int width = resizedImage.getWidth();
+        int height = resizedImage.getHeight();
 
         // 2. ByteBuffer 생성 (FLOAT32, 1x3x480x480)
         ByteBuffer inputBuffer = ByteBuffer.allocateDirect(4 * 480 * 480 * 3); // 4 bytes per float
         inputBuffer.order(ByteOrder.nativeOrder());
 
-        // 3. 채널 우선 순서로 픽셀 데이터 저장 (1, 3, 480, 480)
-        for (int c = 0; c < 3; c++) { // 채널 순서: R, G, B
-            for (int y = 0; y < 480; y++) {
-                for (int x = 0; x < 480; x++) {
-                    int pixel = resizedImage.getPixel(x, y);
 
-                    float value;
-                    if (c == 0) { // R 채널
-                        value = ((pixel >> 16) & 0xFF) / 255.0f;
-                    } else if (c == 1) { // G 채널
-                        value = ((pixel >> 8) & 0xFF) / 255.0f;
-                    } else { // B 채널
-                        value = (pixel & 0xFF) / 255.0f;
-                    }
+        int[] pixels = new int[width * height];
+        resizedImage.getPixels(pixels, 0, width, 0, 0, width, height);
 
-                    // Normalize: [-1, 1] 범위로 이동
-                    value = (value - 0.5f) / 0.5f;
+        // Tensor의 형태: 1, 3, 480, 480
+        float[] channelR = new float[width * height];
+        float[] channelG = new float[width * height];
+        float[] channelB = new float[width * height];
 
-                    // ByteBuffer에 저장
-                    inputBuffer.putFloat(value);
-                }
-            }
+        for (int i = 0; i < pixels.length; i++) {
+            int pixel = pixels[i];
+
+            // R, G, B 채널 값 추출
+            channelR[i] = ((pixel >> 16) & 0xFF) / 255.0f;
+            channelG[i] = ((pixel >> 8) & 0xFF) / 255.0f;
+            channelB[i] = (pixel & 0xFF) / 255.0f;
         }
+
+        // ByteBuffer에 채널별로 저장 (1, 3, 480, 480 순서)
+        for (int i = 0; i < pixels.length; i++) {
+            // [-1, 1]로 정규화
+            inputBuffer.putFloat((channelR[i] - 0.5f) / 0.5f); // R 채널
+        }
+        for (int i = 0; i < pixels.length; i++) {
+            inputBuffer.putFloat((channelG[i] - 0.5f) / 0.5f); // G 채널
+        }
+        for (int i = 0; i < pixels.length; i++) {
+            inputBuffer.putFloat((channelB[i] - 0.5f) / 0.5f); // B 채널
+        }
+
+        inputBuffer.rewind();
+
+
+//        // 3. 채널 우선 순서로 픽셀 데이터 저장 (1, 3, 480, 480)
+//        for (int c = 0; c < 3; c++) { // 채널 순서: R, G, B
+//            for (int y = 0; y < 480; y++) {
+//                for (int x = 0; x < 480; x++) {
+//                    int pixel = resizedImage.getPixel(x, y);
+//
+//                    float value;
+//                    if (c == 0) { // R 채널
+//                        value = ((pixel >> 16) & 0xFF) / 255.0f;
+//                    } else if (c == 1) { // G 채널
+//                        value = ((pixel >> 8) & 0xFF) / 255.0f;
+//                    } else { // B 채널
+//                        value = (pixel & 0xFF) / 255.0f;
+//                    }
+//
+//                    // Normalize: [-1, 1] 범위로 이동
+//                    value = (value - 0.5f) / 0.5f;
+//
+//                    // ByteBuffer에 저장
+//                    inputBuffer.putFloat(value);
+//                }
+//            }
+//        }
 
         return new ByteBuffer[] {inputBuffer};
     }
