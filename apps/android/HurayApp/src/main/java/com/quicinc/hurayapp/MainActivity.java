@@ -34,6 +34,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.quicinc.ImageProcessing;
 import com.quicinc.tflite.AIHubDefaults;
+import com.quicinc.tflite.ClsAIHubDefaults;
 
 import org.opencv.core.Rect2d;
 
@@ -43,6 +44,7 @@ import java.security.NoSuchAlgorithmException;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -462,7 +464,7 @@ public class MainActivity extends AppCompatActivity {
                         this,
                         cls_tfLiteModelAsset,
                         cls_tfLiteLabelsAsset,
-                        AIHubDefaults.delegatePriorityOrder /* AI Hub Defaults */
+                        ClsAIHubDefaults.delegatePriorityOrder /* AI Hub Defaults */
                 );
                 delegateClassifierInitTime = System.nanoTime() - delegateClassifierInitStartTime;
                 Log.d("ModelInit", "Delegate Classifier Init Time: " + delegateClassifierInitTime / 1000000 + " ms");
@@ -473,11 +475,13 @@ public class MainActivity extends AppCompatActivity {
                         this,
                         cls_tfLiteModelAsset,
                         cls_tfLiteLabelsAsset,
-                        AIHubDefaults.delegatePriorityOrderForDelegates(new HashSet<>() /* No delegates; cpu only */)
+                        ClsAIHubDefaults.delegatePriorityOrderForDelegates(new HashSet<>() /* No delegates; cpu only */)
                 );
                 cpuClassifierInitTime = System.nanoTime() - cpuClassifierInitStartTime;
                 Log.d("ModelInit", "CPU Classifier Init Time: " + cpuClassifierInitTime / 1000000 + " ms");
 
+                Log.d("ModelInit", "Default Classifier Delegates: " + Arrays.deepToString(ClsAIHubDefaults.delegatePriorityOrder));
+                Log.d("ModelInit", "CPU Only Classifier Delegates: " + Arrays.deepToString(ClsAIHubDefaults.delegatePriorityOrderForDelegates(new HashSet<>())));
 
 
                 //TODO: detector
@@ -490,7 +494,7 @@ public class MainActivity extends AppCompatActivity {
                         AIHubDefaults.delegatePriorityOrder
                 );
                 delegateDetectorInitTime = System.nanoTime() - delegateDetectorInitStartTime;
-                Log.d("ModelInit", "Delegate Detector Init Time: " + delegateClassifierInitTime / 1000000 + " ms");
+                Log.d("ModelInit", "Delegate Detector Init Time: " + delegateDetectorInitTime / 1000000 + " ms");
 
                 long cpuDetectorInitTime;
                 long cpuDetectorInitStartTime = System.nanoTime();
@@ -501,8 +505,10 @@ public class MainActivity extends AppCompatActivity {
                         AIHubDefaults.delegatePriorityOrderForDelegates(new HashSet<>() /* No delegates; cpu only */)
                 );
                 cpuDetectorInitTime = System.nanoTime() - cpuDetectorInitStartTime;
-                Log.d("ModelInit", "CPU Detector Init Time: " + delegateClassifierInitTime / 1000000 + " ms");
+                Log.d("ModelInit", "CPU Detector Init Time: " + cpuDetectorInitTime / 1000000 + " ms");
 
+                Log.d("ModelInit", "Default Detector Delegates: " + Arrays.deepToString(AIHubDefaults.delegatePriorityOrder));
+                Log.d("ModelInit", "CPU Only Detector Delegates: " + Arrays.deepToString(AIHubDefaults.delegatePriorityOrderForDelegates(new HashSet<>())));
 
             } catch (IOException | NoSuchAlgorithmException e) {
                 throw new RuntimeException(e.getMessage());

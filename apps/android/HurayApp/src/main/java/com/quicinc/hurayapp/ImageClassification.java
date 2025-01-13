@@ -12,7 +12,8 @@ import android.graphics.Paint;
 import android.util.Log;
 import android.util.Pair;
 
-import com.quicinc.tflite.AIHubDefaults;
+//import com.quicinc.tflite.AIHubDefaults;
+import com.quicinc.tflite.ClsAIHubDefaults;
 import com.quicinc.tflite.TFLiteHelpers;
 
 import org.opencv.core.Rect2d;
@@ -68,7 +69,7 @@ public class ImageClassification implements AutoCloseable {
     public ImageClassification(Context context,
                                String modelPath,
                                String labelsPath) throws IOException, NoSuchAlgorithmException {
-        this(context, modelPath, labelsPath, AIHubDefaults.delegatePriorityOrder);
+        this(context, modelPath, labelsPath, ClsAIHubDefaults.delegatePriorityOrder);
     }
 
     /**
@@ -95,7 +96,7 @@ public class ImageClassification implements AutoCloseable {
         Pair<Interpreter, Map<TFLiteHelpers.DelegateType, Delegate>> iResult = TFLiteHelpers.CreateInterpreterAndDelegatesFromOptions(
             modelAndHash.first,
             delegatePriorityOrder,
-            AIHubDefaults.numCPUThreads,
+            ClsAIHubDefaults.numCPUThreads,
             context.getApplicationInfo().nativeLibraryDir,
             context.getCacheDir().getAbsolutePath(),
             modelAndHash.second
