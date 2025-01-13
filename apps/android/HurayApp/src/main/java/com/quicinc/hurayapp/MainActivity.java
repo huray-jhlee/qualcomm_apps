@@ -73,6 +73,8 @@ public class MainActivity extends AppCompatActivity {
                     "Sample1.jpg",
                     "Sample2.jpg",
                     "Sample3.jpg",
+                    "Sample4.jpg",
+                    "Sample5.jpg",
                     fromGalleryImageSelectorOption};
 
     // Inference Elements

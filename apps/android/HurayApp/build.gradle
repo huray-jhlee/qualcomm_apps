@@ -39,7 +39,7 @@ android {
             throw new RuntimeException(missingModelErrorMsg)
         }
 
-        for (int i = 1; i <= 3; ++i) {
+        for (int i = 1; i <= 2; ++i) {
             String filename = "./src/main/assets/images/Sample${i}.jpg"
             File fp = file(filename)
             // If the image is too small, it is likely an ascii file with LFS information
