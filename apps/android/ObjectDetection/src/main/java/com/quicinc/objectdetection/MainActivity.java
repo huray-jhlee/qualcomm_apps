@@ -8,7 +8,10 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.ImageDecoder;
+import android.graphics.Paint;
+import android.graphics.Canvas;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -45,8 +48,10 @@ import java.util.HashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import java.util.List;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Rect2d;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -326,11 +331,67 @@ public class MainActivity extends AppCompatActivity {
         // Exit the main UI thread and execute the model in the background.
         backgroundTaskExecutor.execute(() -> {
             // Background task
-            Pair<Bitmap, ArrayList<String>> result = objectDetection.predictClassesFromImage(selectedImage);
-
-            Bitmap processedBitmap = result.first;
+//            Pair<Bitmap, ArrayList<String>> result = objectDetection.predictClassesFromImage(selectedImage);
+            Pair<List<Rect2d>, ArrayList<String>> result = objectDetection.detectObjectsFromImage(selectedImage);
+            List<Rect2d> boxes = result.first;
             ArrayList<String> labels = result.second;
-            // labels를 개행문자로 연결
+
+            long det_inferenceTime = objectDetection.getLastInferenceTime();
+            long det_predictionTime = objectDetection.getLastPostprocessingTime() + det_inferenceTime + objectDetection.getLastPreprocessingTime();
+            String det_inferenceTimeText = timeFormatter.format((double) det_inferenceTime / 1000000);
+            String det_predictionTimeText = timeFormatter.format((double) det_predictionTime / 1000000);
+
+
+            // 이제.... boxes와 입력 이미지로 박스를 그려야 한다.
+
+            // make processedBitmap
+            Paint paint = new Paint();
+            paint.setColor(Color.RED);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2);
+
+            Paint textPaint = new Paint();
+            textPaint.setColor(Color.WHITE);
+            textPaint.setTextSize(30);
+
+            Bitmap mutableImage = selectedImage.copy(Bitmap.Config.ARGB_8888, true);
+            Canvas canvas = new Canvas(mutableImage);
+            int imgWidth = selectedImage.getWidth();
+            int imgHeight = selectedImage.getHeight();
+
+            for (int i=0; i<boxes.size(); i++) {
+                Rect2d box = boxes.get(i);
+                String text = labels.get(i);
+
+                canvas.drawRect(
+                        (float) box.x,
+                        (float) box.y,
+                        (float) (box.x + box.width),
+                        (float) (box.y + box.height),
+                        paint
+                );
+
+                float textWidth = textPaint.measureText(text);
+                float textHeight = textPaint.getTextSize();
+                float labelX = Math.max(0, Math.min((float) box.x, imgWidth - textWidth));
+                float labelY = Math.max(0, Math.min((float) box.y - 10, imgHeight - textHeight));
+
+                canvas.drawText(
+                        text,
+                        labelX,
+                        labelY + 35,
+                        textPaint
+                );
+
+
+            }
+
+            Bitmap processedBitmap = mutableImage;
+
+            // 기존에 사용하던 Result를 변경..
+//            Bitmap processedBitmap = result.first;
+//            ArrayList<String> labels = result.second;
+//             labels를 개행문자로 연결
             String joinedLabels = String.join("\n", labels);
 
             long inferenceTime = objectDetection.getLastInferenceTime();

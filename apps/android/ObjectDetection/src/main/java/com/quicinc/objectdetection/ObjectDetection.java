@@ -29,6 +29,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.MappedByteBuffer;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -276,64 +277,44 @@ public class ObjectDetection implements AutoCloseable {
      *
      * @return Predicted object class names, in order of confidence (highest confidence first).
      */
-
-    private Pair<Bitmap, ArrayList<String>> postprocess(Bitmap img, float[][][] outputs, float[] padding) {
+    private Pair<List<Rect2d>, ArrayList<String>> postprocess(Bitmap img, float[][][] outputs, float[] padding) {
         long postStartTime = System.nanoTime();
-
-        Paint paint = new Paint();
-        paint.setColor(Color.RED);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(2);
-
-        Paint textPaint = new Paint();
-        textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(30);
-
-        Bitmap mutableImage = img.copy(Bitmap.Config.ARGB_8888, true);
-        Canvas canvas = new Canvas(mutableImage);
 
         List<Rect2d> boxes = new ArrayList<>();
         List<Float> scores = new ArrayList<>();
         List<Integer> classIds = new ArrayList<>();
         ArrayList<String> resultLabels = new ArrayList<>();
 
-        // 이미지 크기 및 스케일 계산
+        List<Rect2d> filteredBoxes = new ArrayList<>();
+
         int imgWidth = img.getWidth();
         int imgHeight = img.getHeight();
         float maxDimension = Math.max(imgWidth, imgHeight);
 
-        // 모델 출력 데이터를 변환
         for (int i = 0; i < outputs[0][0].length; i++) {
-            // 모델 출력값 (cx, cy, w, h, confidence)
             float cx = outputs[0][0][i];
             float cy = outputs[0][1][i];
             float w = outputs[0][2][i];
             float h = outputs[0][3][i];
             float confidence = outputs[0][4][i];
 
-            // Confidence Threshold 적용
             if (confidence > confThreshold) {
-
-                // 패딩 및 크기 조정
                 cx = (cx - padding[1]) * maxDimension;
                 cy = (cy - padding[0]) * maxDimension;
                 w *= maxDimension;
                 h *= maxDimension;
 
-                // 좌표 변환: (cx, cy, w, h) -> (xmin, ymin, xmax, ymax)
                 double xmin = cx - w / 2.0;
                 double ymin = cy - h / 2.0;
                 double xmax = cx + w / 2.0;
                 double ymax = cy + h / 2.0;
 
-                // 박스 정보 저장
                 boxes.add(new Rect2d(xmin, ymin, xmax - xmin, ymax - ymin));
                 scores.add(confidence);
 
-                // 클래스 ID 계산
                 int maxClassId = -1;
                 float maxClassScore = Float.NEGATIVE_INFINITY;
-                for (int j = 5; j < outputs[0].length; j++) {
+                for (int j = 5; j < outputs[0].length; j++ ) {
                     float classScore = outputs[0][j][i];
                     if (classScore > maxClassScore) {
                         maxClassScore = classScore;
@@ -343,7 +324,8 @@ public class ObjectDetection implements AutoCloseable {
                 classIds.add(maxClassId);
             }
         }
-        // NMS 적용
+
+        // nms
         if (!boxes.isEmpty() && !scores.isEmpty()) {
             MatOfRect2d matBoxes = new MatOfRect2d();
             matBoxes.fromList(boxes);
@@ -354,45 +336,139 @@ public class ObjectDetection implements AutoCloseable {
             MatOfInt nmsIndices = new MatOfInt();
             Dnn.NMSBoxes(matBoxes, matScores, confThreshold, iouThreshold, nmsIndices);
 
-            // NMS 결과만 처리 및 박스 그리기
             for (int idx : nmsIndices.toArray()) {
                 Rect2d box = boxes.get(idx);
+                filteredBoxes.add(box);
+
                 int classId = classIds.get(idx);
                 float score = scores.get(idx);
                 String label = labelList.get(classId);
                 String text = label + " / " + String.format("%.2f", score);
                 resultLabels.add(text);
-
-                // 박스 그리기
-                canvas.drawRect(
-                        (float) box.x,
-                        (float) box.y,
-                        (float) (box.x + box.width),
-                        (float) (box.y + box.height),
-                        paint
-                );
-
-                // 텍스트 배경 및 위치 계산
-                float textWidth = textPaint.measureText(text);
-                float textHeight = textPaint.getTextSize();
-                float labelX = Math.max(0, Math.min((float) box.x, imgWidth - textWidth));
-                float labelY = Math.max(0, Math.min((float) box.y - 10, imgHeight - textHeight));
-
-                // 텍스트 그리기
-                canvas.drawText(
-                        text,
-                        labelX,
-                        labelY + 35,
-                        textPaint
-                );
             }
         }
-
         postprocessingTime = System.nanoTime() - postStartTime;
-        Log.d(TAG, "Postprocessing Time: " + postprocessingTime / 1_000_000 + " ms");
+        Log.d(TAG, "Postprocessing Time: " + postprocessingTime / 1000000 + " ms");
 
-        return new Pair<> (mutableImage, resultLabels);
+        return new Pair<> (filteredBoxes, resultLabels);
     }
+
+//    private Pair<Bitmap, ArrayList<String>> postprocess(Bitmap img, float[][][] outputs, float[] padding) {
+//        long postStartTime = System.nanoTime();
+//
+//        Paint paint = new Paint();
+//        paint.setColor(Color.RED);
+//        paint.setStyle(Paint.Style.STROKE);
+//        paint.setStrokeWidth(2);
+//
+//        Paint textPaint = new Paint();
+//        textPaint.setColor(Color.WHITE);
+//        textPaint.setTextSize(30);
+//
+//        Bitmap mutableImage = img.copy(Bitmap.Config.ARGB_8888, true);
+//        Canvas canvas = new Canvas(mutableImage);
+//
+//        List<Rect2d> boxes = new ArrayList<>();
+//        List<Float> scores = new ArrayList<>();
+//        List<Integer> classIds = new ArrayList<>();
+//        ArrayList<String> resultLabels = new ArrayList<>();
+//
+//        // 이미지 크기 및 스케일 계산
+//        int imgWidth = img.getWidth();
+//        int imgHeight = img.getHeight();
+//        float maxDimension = Math.max(imgWidth, imgHeight);
+//
+//        // 모델 출력 데이터를 변환
+//        for (int i = 0; i < outputs[0][0].length; i++) {
+//            // 모델 출력값 (cx, cy, w, h, confidence)
+//            float cx = outputs[0][0][i];
+//            float cy = outputs[0][1][i];
+//            float w = outputs[0][2][i];
+//            float h = outputs[0][3][i];
+//            float confidence = outputs[0][4][i];
+//
+//            // Confidence Threshold 적용
+//            if (confidence > confThreshold) {
+//
+//                // 패딩 및 크기 조정
+//                cx = (cx - padding[1]) * maxDimension;
+//                cy = (cy - padding[0]) * maxDimension;
+//                w *= maxDimension;
+//                h *= maxDimension;
+//
+//                // 좌표 변환: (cx, cy, w, h) -> (xmin, ymin, xmax, ymax)
+//                double xmin = cx - w / 2.0;
+//                double ymin = cy - h / 2.0;
+//                double xmax = cx + w / 2.0;
+//                double ymax = cy + h / 2.0;
+//
+//                // 박스 정보 저장
+//                boxes.add(new Rect2d(xmin, ymin, xmax - xmin, ymax - ymin));
+//                scores.add(confidence);
+//
+//                // 클래스 ID 계산
+//                int maxClassId = -1;
+//                float maxClassScore = Float.NEGATIVE_INFINITY;
+//                for (int j = 5; j < outputs[0].length; j++) {
+//                    float classScore = outputs[0][j][i];
+//                    if (classScore > maxClassScore) {
+//                        maxClassScore = classScore;
+//                        maxClassId = j - 5;
+//                    }
+//                }
+//                classIds.add(maxClassId);
+//            }
+//        }
+//        // NMS 적용
+//        if (!boxes.isEmpty() && !scores.isEmpty()) {
+//            MatOfRect2d matBoxes = new MatOfRect2d();
+//            matBoxes.fromList(boxes);
+//
+//            MatOfFloat matScores = new MatOfFloat();
+//            matScores.fromArray(toPrimitive(scores));
+//
+//            MatOfInt nmsIndices = new MatOfInt();
+//            Dnn.NMSBoxes(matBoxes, matScores, confThreshold, iouThreshold, nmsIndices);
+//
+//            // NMS 결과만 처리 및 박스 그리기
+//            for (int idx : nmsIndices.toArray()) {
+//                Rect2d box = boxes.get(idx);
+//                int classId = classIds.get(idx);
+//                float score = scores.get(idx);
+//                String label = labelList.get(classId);
+//                String text = label + " / " + String.format("%.2f", score);
+//                resultLabels.add(text);
+//
+//                // 박스 그리기
+//                canvas.drawRect(
+//                        (float) box.x,
+//                        (float) box.y,
+//                        (float) (box.x + box.width),
+//                        (float) (box.y + box.height),
+//                        paint
+//                );
+//
+//                // 텍스트 배경 및 위치 계산
+//                float textWidth = textPaint.measureText(text);
+//                float textHeight = textPaint.getTextSize();
+//                float labelX = Math.max(0, Math.min((float) box.x, imgWidth - textWidth));
+//                float labelY = Math.max(0, Math.min((float) box.y - 10, imgHeight - textHeight));
+//
+//                // 텍스트 그리기
+//                canvas.drawText(
+//                        text,
+//                        labelX,
+//                        labelY + 35,
+//                        textPaint
+//                );
+//            }
+//        }
+//
+//        postprocessingTime = System.nanoTime() - postStartTime;
+//        Log.d(TAG, "Postprocessing Time: " + postprocessingTime / 1_000_000 + " ms");
+//
+//        return new Pair<> (mutableImage, resultLabels);
+//    }
 
     // float[] 변환 유틸리티 함수
     private float[] toPrimitive(List<Float> list) {
@@ -409,29 +485,48 @@ public class ObjectDetection implements AutoCloseable {
      * @param image RGBA-8888 bitmap image to predict class of.
      * @return Predicted object class names, in order of confidence (highest confidence first).
      */
-    public Pair<Bitmap, ArrayList<String>> predictClassesFromImage(Bitmap image) {
-        // Preprocessing: Resize, convert type
+    public Pair<List<Rect2d>, ArrayList<String>> detectObjectsFromImage(Bitmap image) {
         ResizeResult result = preprocess(image);
         Bitmap paddedImage = result.processedImage;
         float[] padding = result.padding;
 
-        // Convert padded image to ByteBuffer for model input
         ByteBuffer inputBuffer;
         if (inputType == DataType.FLOAT32) {
-            inputBuffer = convertBitmapToByteBuffer(paddedImage, true); // Normalize to [0, 1]
+            inputBuffer = convertBitmapToByteBuffer(paddedImage, true);
         } else {
-            inputBuffer = convertBitmapToByteBuffer(paddedImage, false); // keep values as UINT8
+            inputBuffer = convertBitmapToByteBuffer(paddedImage, false);
         }
 
-        // Inference
         Map<Integer, Object> outputs = new HashMap<>();
-        float[][][] outputBuffer = new float[1][6][8400]; // YOLO 모델 출력 크기 (예시)
+        float[][][] outputBuffer = new float[1][6][8400];
         outputs.put(0, outputBuffer);
         tfLiteInterpreter.runForMultipleInputsOutputs(new ByteBuffer[]{inputBuffer}, outputs);
 
-        // Postprocessing: Process the outputs and return labels
         return postprocess(image, outputBuffer, padding);
     }
+//    public Pair<Bitmap, ArrayList<String>> predictClassesFromImage(Bitmap image) {
+//        // Preprocessing: Resize, convert type
+//        ResizeResult result = preprocess(image);
+//        Bitmap paddedImage = result.processedImage;
+//        float[] padding = result.padding;
+//
+//        // Convert padded image to ByteBuffer for model input
+//        ByteBuffer inputBuffer;
+//        if (inputType == DataType.FLOAT32) {
+//            inputBuffer = convertBitmapToByteBuffer(paddedImage, true); // Normalize to [0, 1]
+//        } else {
+//            inputBuffer = convertBitmapToByteBuffer(paddedImage, false); // keep values as UINT8
+//        }
+//
+//        // Inference
+//        Map<Integer, Object> outputs = new HashMap<>();
+//        float[][][] outputBuffer = new float[1][6][8400]; // YOLO 모델 출력 크기 (예시)
+//        outputs.put(0, outputBuffer);
+//        tfLiteInterpreter.runForMultipleInputsOutputs(new ByteBuffer[]{inputBuffer}, outputs);
+//
+//        // Postprocessing: Process the outputs and return labels
+//        return postprocess(image, outputBuffer, padding);
+//    }
 
     /**
      * Return the indices of the top K elements in a float buffer.
