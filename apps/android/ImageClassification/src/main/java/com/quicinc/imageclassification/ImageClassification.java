@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class ImageClassification implements AutoCloseable {
     private static final int DEFAULT_TOP_K = 5;
@@ -170,73 +171,44 @@ public class ImageClassification implements AutoCloseable {
      * @param image RGBA-8888 Bitmap to preprocess.
      * @return Array of inputs to pass to the interpreter.
      */
-    private ByteBuffer[] preprocess(Bitmap image) {
+
+    public ByteBuffer[] preprocess(Bitmap image) {
         long prepStartTime = System.nanoTime();
-        Bitmap resizedImg;
 
-        // Resize input image
-        if (image.getHeight() != inputShape[2] || image.getWidth() != inputShape[3]) {
-            resizedImg = ImageProcessing.resizeAndPadMaintainAspectRatio(image, inputShape[2], inputShape[3], 0);
-        } else {
-            resizedImg = image;
-        }
-
-        // Convert type and fill input buffer
-        ByteBuffer inputBuffer;
-        TensorImage tImg = TensorImage.fromBitmap(resizedImg);
-        if (inputType == DataType.FLOAT32) {
-            inputBuffer = imageProcessor.process(tImg).getBuffer();
-        } else {
-            inputBuffer = tImg.getTensorBuffer().getBuffer();
-        }
-
-        preprocessingTime = System.nanoTime() - prepStartTime;
-        Log.d(TAG, "Preprocessing Time: " + preprocessingTime / 1000000 + " ms");
-
-        return new ByteBuffer[] {inputBuffer};
-    }
-
-    public ByteBuffer[] preprocessImage(Bitmap image) {
-        long prepStartTime = System.nanoTime();
+        int width = 480;
+        int height = 480;
 
         // 1. 이미지 리사이즈 (480x480 고정)
-        Bitmap resizedImage = Bitmap.createScaledBitmap(image, 480, 480, true);
+        Bitmap resizedImage = Bitmap.createScaledBitmap(image, width, height, true);
 
         // 2. ByteBuffer 생성 (FLOAT32, 1x3x480x480)
-        ByteBuffer inputBuffer = ByteBuffer.allocateDirect(4 * 480 * 480 * 3); // 4 bytes per float
+        ByteBuffer inputBuffer = ByteBuffer.allocateDirect(4 * width * height * 3); // 4 bytes per float
         inputBuffer.order(ByteOrder.nativeOrder());
 
-        // 3. 채널 우선 순서로 픽셀 데이터 저장 (1, 3, 480, 480)
-        for (int c = 0; c < 3; c++) { // 채널 순서: R, G, B
-            for (int y = 0; y < 480; y++) {
-                for (int x = 0; x < 480; x++) {
-                    int pixel = resizedImage.getPixel(x, y);
+        int[] pixels = new int[width * height];
+        resizedImage.getPixels(pixels, 0, width, 0, 0, width, height);
 
-                    float value;
-                    if (c == 0) { // R 채널
-                        value = ((pixel >> 16) & 0xFF) / 255.0f;
-                    } else if (c == 1) { // G 채널
-                        value = ((pixel >> 8) & 0xFF) / 255.0f;
-                    } else { // B 채널
-                        value = (pixel & 0xFF) / 255.0f;
-                    }
+        float[] normalizedData = new float[pixels.length * 3];
 
-                    // Normalize: [-1, 1] 범위로 이동
-                    value = (value - 0.5f) / 0.5f;
+        IntStream.range(0, pixels.length).parallel().forEach(i -> {
+            int pixel = pixels[i];
 
-                    // ByteBuffer에 저장
-                    inputBuffer.putFloat(value);
-                }
-            }
-        }
+            float r = ((pixel >> 16) & 0xFF) / 255.0f;
+            float g = ((pixel >> 8) & 0xFF) / 255.0f;
+            float b = (pixel & 0xFF) / 255.0f;
 
-        // 4. 전처리 시간 로깅
+            normalizedData[i] = (r - 0.5f) / 0.5f;
+            normalizedData[i + pixels.length] = (g - 0.5f) / 0.5f;
+            normalizedData[i + pixels.length * 2] = (b - 0.5f) / 0.5f;
+        });
+
+        inputBuffer.asFloatBuffer().put(normalizedData);
+        inputBuffer.rewind();
 
         preprocessingTime = System.nanoTime() - prepStartTime;
         Log.d(TAG, "Preprocessing Time: " + preprocessingTime / 1000000 + " ms");
 
-        // 5. ByteBuffer 반환
-        return new ByteBuffer[] {inputBuffer};
+        return new ByteBuffer[]{inputBuffer};
     }
 
     /**
@@ -244,25 +216,8 @@ public class ImageClassification implements AutoCloseable {
      *
      * @return Predicted object class names, in order of confidence (highest confidence first).
      */
-    private ArrayList<String> postprocess() {
-        long postStartTime = System.nanoTime();
 
-        List<Integer> indexList;
-        ByteBuffer outputBuffer = tfLiteInterpreter.getOutputTensor(0).asReadOnlyBuffer();
-        if (outputType == DataType.FLOAT32) {
-            indexList = findTopKFloatIndices(outputBuffer.asFloatBuffer(), TOPK);
-        } else {
-            indexList = findTopKByteIndices(outputBuffer, TOPK);
-        }
-        ArrayList<String> labels = indexList.stream().map(labelList::get).collect(Collectors.toCollection(ArrayList<String>::new));
-
-        postprocessingTime = System.nanoTime() - postStartTime;
-        Log.d(TAG, "Postprocessing Time: " + postprocessingTime / 1000000 + " ms");
-
-        return labels;
-    }
-
-    private ArrayList<Pair<String, Float>> postprocessSoftmaxTopK(int topK) {
+    private ArrayList<Pair<String, Float>> postprocess(int topK) {
         long postStartTime = System.nanoTime();
 
         // 1. 출력 텐서 가져오기
@@ -313,14 +268,14 @@ public class ImageClassification implements AutoCloseable {
     public ArrayList<String> predictClassesFromImage(Bitmap image) {
         // Preprocessing: Resize, convert type
 //        ByteBuffer[] inputs = preprocess(image);
-        ByteBuffer[] inputs = preprocessImage(image);
+        ByteBuffer[] inputs = preprocess(image);
 
         // Inference
         tfLiteInterpreter.runForMultipleInputsOutputs(inputs, new HashMap<>());
 
         // tmp
         // Postprocessing: Compute top K indices and convert to labels
-        ArrayList<Pair<String, Float>> results = postprocessSoftmaxTopK(DEFAULT_TOP_K);
+        ArrayList<Pair<String, Float>> results = postprocess(DEFAULT_TOP_K);
 
         // 확률값(Float)을 제외하고 클래스 이름(String)만 반환
         ArrayList<String> classNames = new ArrayList<>();
@@ -329,9 +284,7 @@ public class ImageClassification implements AutoCloseable {
 
             Log.d(TAG, "Class: " + result.first + ", Score: " + result.second);
         }
-        //
 
-        // Postprocessing: Compute top K indices and convert to labels
         return classNames;
     }
 
