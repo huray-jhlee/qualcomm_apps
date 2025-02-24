@@ -15,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.util.Pair;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -37,8 +38,10 @@ import com.quicinc.tflite.AIHubDefaults;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Array;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -311,7 +314,22 @@ public class MainActivity extends AppCompatActivity {
         // Exit the main UI thread and execute the model in the background.
         backgroundTaskExecutor.execute(() -> {
             // Background task
-            String result = imageClassification.predictClassesFromImage(selectedImage).stream().collect(Collectors.joining(", "));
+//            String result = imageClassification.predictClassesFromImage(selectedImage).stream().collect(Collectors.joining(", "));
+            ArrayList<Pair<String, Float>> resultsList = imageClassification.predictClassesFromImage(selectedImage);
+
+            ArrayList<String> saveResults = new ArrayList<>();
+
+            for (Pair<String, Float> result : resultsList) {
+                StringBuilder resultStringBuilder = new StringBuilder();
+
+                resultStringBuilder.append(result.first)
+                                    .append("-")
+                                    .append(result.second);
+                String resultString = resultStringBuilder.toString();
+                saveResults.add(resultString);
+            }
+            String result = String.join("\n", saveResults);
+
             long inferenceTime = imageClassification.getLastInferenceTime();
             long predictionTime = imageClassification.getLastPostprocessingTime() + inferenceTime + imageClassification.getLastPreprocessingTime();
             String inferenceTimeText = timeFormatter.format((double) inferenceTime / 1000000);

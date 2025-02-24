@@ -265,8 +265,10 @@ public class ImageClassification implements AutoCloseable {
      * @param image RGBA-8888 bitmap image to predict class of.
      * @return Predicted object class names, in order of confidence (highest confidence first).
      */
-    public ArrayList<String> predictClassesFromImage(Bitmap image) {
-        // Preprocessing: Resize, convert type
+//    public ArrayList<String> predictClassesFromImage(Bitmap image) {
+    public ArrayList<Pair<String, Float>> predictClassesFromImage(Bitmap image) {
+
+            // Preprocessing: Resize, convert type
 //        ByteBuffer[] inputs = preprocess(image);
         ByteBuffer[] inputs = preprocess(image);
 
@@ -278,14 +280,14 @@ public class ImageClassification implements AutoCloseable {
         ArrayList<Pair<String, Float>> results = postprocess(DEFAULT_TOP_K);
 
         // 확률값(Float)을 제외하고 클래스 이름(String)만 반환
-        ArrayList<String> classNames = new ArrayList<>();
-        for (Pair<String, Float> result : results) {
-            classNames.add(result.first); // 클래스 이름 추가
+//        ArrayList<String> classNames = new ArrayList<>();
+//        for (Pair<String, Float> result : results) {
+//            classNames.add(result.first); // 클래스 이름 추가
+//
+//            Log.d(TAG, "Class: " + result.first + ", Score: " + result.second);
+//        }
 
-            Log.d(TAG, "Class: " + result.first + ", Score: " + result.second);
-        }
-
-        return classNames;
+        return results;
     }
 
     /**
