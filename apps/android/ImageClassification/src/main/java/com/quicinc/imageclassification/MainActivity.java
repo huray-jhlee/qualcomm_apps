@@ -61,10 +61,11 @@ public class MainActivity extends AppCompatActivity {
     private final String notSelectedImageSelectorOption = "Not Selected";
     private final String[] imageSelectorOptions =
             { notSelectedImageSelectorOption,
-                    "Sample1.png",
-                    "Sample2.png",
-                    "Sample3.png",
-                    "katsu.jpg",
+                    "Sample1.jpg",
+                    "Sample2.jpg",
+                    "Sample3.jpg",
+                    "Sample4.jpg",
+                    "Sample5.jpg",
                     fromGalleryImageSelectorOption};
 
     // Inference Elements
