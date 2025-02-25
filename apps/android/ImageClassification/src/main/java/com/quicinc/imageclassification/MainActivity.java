@@ -6,6 +6,8 @@ package com.quicinc.imageclassification;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageDecoder;
@@ -15,6 +17,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.util.Pair;
 import android.view.View;
 import android.widget.AdapterView;
@@ -59,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     TextView predictionTimeView;
     Spinner imageSelector;
     Button predictionButton;
+    Button resetFlagButton;
     ActivityResultLauncher<Intent> selectImageResultLauncher;
     private final String fromGalleryImageSelectorOption = "From Gallery";
     private final String notSelectedImageSelectorOption = "Not Selected";
@@ -79,6 +83,8 @@ public class MainActivity extends AppCompatActivity {
     NumberFormat timeFormatter = new DecimalFormat("0.00");
     ExecutorService backgroundTaskExecutor = Executors.newSingleThreadExecutor();
     Handler mainLooperHandler = new Handler(Looper.getMainLooper());
+
+    private String selectedImageFileName = null;
 
     /**
      * Instantiate the activity on first load.
@@ -105,6 +111,9 @@ public class MainActivity extends AppCompatActivity {
         predictionTimeView = (TextView)findViewById(R.id.predictionTimeResultText);
         predictionButton = (Button)findViewById(R.id.runModelButton);
 
+        resetFlagButton = (Button)findViewById(R.id.resetFlagButton);
+        resetFlagButton.setOnClickListener(view -> resetJson());
+
         // Setup Image Selector Dropdown
         ArrayAdapter ad = new ArrayAdapter(this, android.R.layout.simple_spinner_item, imageSelectorOptions);
         ad.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -112,6 +121,8 @@ public class MainActivity extends AppCompatActivity {
         imageSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedOption = parent.getItemAtPosition(position).toString();
+
                 // Load selected picture from assets
                 ((TextView) view).setTextColor(getResources().getColor(R.color.white));
                 if (!parent.getItemAtPosition(position).equals(notSelectedImageSelectorOption)) {
@@ -121,6 +132,7 @@ public class MainActivity extends AppCompatActivity {
                         i.setAction(Intent.ACTION_GET_CONTENT);
                         selectImageResultLauncher.launch(i);
                     } else {
+                        selectedImageFileName = selectedOption;
                         loadImageFromStringAsync((String) parent.getItemAtPosition(position));
                     }
                 } else {
@@ -275,6 +287,8 @@ public class MainActivity extends AppCompatActivity {
             // Background task
             Bitmap scaledImage;
             try {
+                selectedImageFileName = getFileNameFromUri(imageUri);
+
                 if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     selectedImage = ImageDecoder.decodeBitmap(ImageDecoder.createSource(getContentResolver(), imageUri), (decoder, info, src) -> {
                         decoder.setMutableRequired(true);
@@ -293,6 +307,19 @@ public class MainActivity extends AppCompatActivity {
                 setInferenceUIEnabled(true);
             });
         });
+    }
+
+    private String getFileNameFromUri(Uri uri){
+        String fileName = null;
+        Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+        if (cursor != null && cursor.moveToFirst()) {
+            int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+            if (nameIndex != -1) {
+                fileName = cursor.getString(nameIndex);
+            }
+            cursor.close();
+        }
+        return fileName;
     }
 
     /**
@@ -316,6 +343,14 @@ public class MainActivity extends AppCompatActivity {
             // Background task
 //            String result = imageClassification.predictClassesFromImage(selectedImage).stream().collect(Collectors.joining(", "));
             ArrayList<Pair<String, Float>> resultsList = imageClassification.predictClassesFromImage(selectedImage);
+
+            // JSON Save
+            boolean firstRun = isFirstRun();
+            if (firstRun) {
+                setFirstRunFalse();
+            }
+            String imagePath = selectedImageFileName;
+            JsonFileUtils.saveJsonToFile(this, "classification_results.json", imagePath, resultsList, firstRun);
 
             ArrayList<String> saveResults = new ArrayList<>();
 
@@ -401,5 +436,27 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         if (cpuOnlyClassifier != null) cpuOnlyClassifier.close();
         if (defaultDelegateClassifier != null) defaultDelegateClassifier.close();
+    }
+
+
+    private boolean isFirstRun() {
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        return prefs.getBoolean("isFirstRun", true);
+    }
+
+    private void setFirstRunFalse() {
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("isFirstRun", false);
+        editor.apply();
+    }
+
+    private void resetJson() {
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("isFirstRun", true);
+        editor.apply();
+
+        Log.d("DEBUG", "Reset 버튼 클릭 → isFirstRun이 true로 변경됨 (기존 JSON 삭제 없음)");
     }
 }
