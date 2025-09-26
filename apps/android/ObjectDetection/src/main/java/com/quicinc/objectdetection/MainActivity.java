@@ -7,6 +7,7 @@ package com.quicinc.objectdetection;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -355,10 +356,33 @@ public class MainActivity extends AppCompatActivity {
             objectDetection = defaultDelegateDetector;
         }
 
+
+//        String directoryPath = "test_images";
+//        List<String> imagePathList = getImagePathsFromDirectory(directoryPath);
+
+
         // Exit the main UI thread and execute the model in the background.
         backgroundTaskExecutor.execute(() -> {
+
+//            for (String assetPath: imagePathList) {
+//                Bitmap image = loadBitMapFromAssests(assetPath);
+//                if (image == null) continue;
+//
+//                selectedImageFileName = assetPath;
+//                selectedImage = image;
+//
+//                Pair<List<Rect2d>, ArrayList<String>> result = objectDetection.detectObjectsFromImage(selectedImage);
+//
+//                boolean firstRun = isFirstRun();
+//                if (firstRun) {
+//                    setFirstRunFalse();
+//                }
+//                JsonFileUtils.saveJsonToFile(this, "detection_restuls.json", assetPath, result, firstRun);
+//
+//            }
+
+
             // Background task
-//            Pair<Bitmap, ArrayList<String>> result = objectDetection.predictClassesFromImage(selectedImage);
             Pair<List<Rect2d>, ArrayList<String>> result = objectDetection.detectObjectsFromImage(selectedImage);
 
             // Saving JSON
@@ -522,4 +546,31 @@ public class MainActivity extends AppCompatActivity {
         editor.putBoolean("isFirstRun", true);
         editor.apply();
     }
+
+    private List<String> getImagePathsFromDirectory(String directoryPath){
+        List<String> imagePaths = new ArrayList<>();
+        AssetManager assetManager = getAssets();
+
+        try {
+            String[] fileNames = assetManager.list(directoryPath);
+            if (fileNames != null) {
+                for (String fileName: fileNames) {
+                    imagePaths.add(directoryPath + "/" + fileName);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return imagePaths;
+    }
+
+    private Bitmap loadBitMapFromAssests(String assetPath) {
+        try (InputStream inputStream = getAssets().open(assetPath)) {
+            return BitmapFactory.decodeStream(inputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
 }

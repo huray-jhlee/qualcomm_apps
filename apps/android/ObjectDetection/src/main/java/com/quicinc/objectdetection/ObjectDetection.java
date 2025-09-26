@@ -306,10 +306,10 @@ public class ObjectDetection implements AutoCloseable {
 
                 double xmin = cx - w / 2.0;
                 double ymin = cy - h / 2.0;
-                double xmax = cx + w / 2.0;
-                double ymax = cy + h / 2.0;
+//                double xmax = cx + w / 2.0;
+//                double ymax = cy + h / 2.0;
 
-                boxes.add(new Rect2d(xmin, ymin, xmax - xmin, ymax - ymin));
+                boxes.add(new Rect2d(xmin, ymin, w, h));
                 scores.add(confidence);
 
                 int maxClassId = -1;

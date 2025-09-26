@@ -305,11 +305,9 @@ public class ObjectDetection implements AutoCloseable {
                 // 좌표 변환: (cx, cy, w, h) -> (xmin, ymin, xmax, ymax)
                 double xmin = cx - w / 2.0;
                 double ymin = cy - h / 2.0;
-                double xmax = cx + w / 2.0;
-                double ymax = cy + h / 2.0;
 
                 // 박스 정보 저장
-                boxes.add(new Rect2d(xmin, ymin, xmax - xmin, ymax - ymin));
+                boxes.add(new Rect2d(xmin, ymin, w, h));
                 scores.add(confidence);
 
             }

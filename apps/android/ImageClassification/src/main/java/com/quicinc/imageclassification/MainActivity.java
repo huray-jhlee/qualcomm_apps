@@ -7,6 +7,7 @@ package com.quicinc.imageclassification;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.AssetManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -38,6 +39,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.quicinc.ImageProcessing;
 import com.quicinc.tflite.AIHubDefaults;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.NoSuchAlgorithmException;
@@ -46,6 +48,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -338,10 +341,46 @@ public class MainActivity extends AppCompatActivity {
             imageClassification = defaultDelegateClassifier;
         }
 
+//        String directoryPath = "test_images";
+//        List<String> imagePathList = getImagePathsFromDirectory(directoryPath);
+
         // Exit the main UI thread and execute the model in the background.
         backgroundTaskExecutor.execute(() -> {
             // Background task
-//            String result = imageClassification.predictClassesFromImage(selectedImage).stream().collect(Collectors.joining(", "));
+
+//            // 여기서 selectedImage를 넣기 전에 전체를 다 돌리는 작업을 하면 좋을거같은데..
+//            for (String assetPath: imagePathList) {
+//                Bitmap image = loadBitmapFromAssets(assetPath);
+//                if (image == null) continue;
+//
+//                selectedImageFileName = assetPath;
+//                selectedImage = image;
+//
+//                ArrayList<Pair<String, Float>> resultsList = imageClassification.predictClassesFromImage(image);
+//
+//                boolean firstRun = isFirstRun();
+//                if (firstRun) {
+//                    setFirstRunFalse();
+//                }
+//                JsonFileUtils.saveJsonToFile(this, "classification_results.json", assetPath, resultsList, firstRun);
+//
+//                ArrayList<String> saveResults = new ArrayList<>();
+//
+//                for (Pair<String, Float> result : resultsList) {
+//                    StringBuilder resultStringBuilder = new StringBuilder();
+//
+//                    resultStringBuilder.append(result.first)
+//                            .append("-")
+//                            .append(result.second);
+//                    String resultString = resultStringBuilder.toString();
+//                    saveResults.add(resultString);
+//                }
+//
+//            }
+//            Log.d("inf_list", "Done");
+
+
+
             ArrayList<Pair<String, Float>> resultsList = imageClassification.predictClassesFromImage(selectedImage);
 
             // JSON Save
@@ -350,7 +389,7 @@ public class MainActivity extends AppCompatActivity {
                 setFirstRunFalse();
             }
             String imagePath = selectedImageFileName;
-            JsonFileUtils.saveJsonToFile(this, "classification_results.json", imagePath, resultsList, firstRun);
+//            JsonFileUtils.saveJsonToFile(this, "classification_results.json", imagePath, resultsList, firstRun);
 
             ArrayList<String> saveResults = new ArrayList<>();
 
@@ -363,6 +402,9 @@ public class MainActivity extends AppCompatActivity {
                 String resultString = resultStringBuilder.toString();
                 saveResults.add(resultString);
             }
+            // JSON
+
+
             String result = String.join("\n", saveResults);
 
             long inferenceTime = imageClassification.getLastInferenceTime();
@@ -458,5 +500,31 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
 
         Log.d("DEBUG", "Reset 버튼 클릭 → isFirstRun이 true로 변경됨 (기존 JSON 삭제 없음)");
+    }
+
+    private List<String> getImagePathsFromDirectory(String directoryPath) {
+        List<String> imagePaths = new ArrayList<>();
+        AssetManager assetManager = getAssets();
+
+        try{
+            String[] fileNames = assetManager.list(directoryPath);
+            if (fileNames != null) {
+                for (String fileName : fileNames) {
+                    imagePaths.add(directoryPath + "/" + fileName);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return imagePaths;
+    }
+
+    private Bitmap loadBitmapFromAssets(String assetPath) {
+        try (InputStream inputStream = getAssets().open(assetPath)) {
+            return BitmapFactory.decodeStream(inputStream);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }
